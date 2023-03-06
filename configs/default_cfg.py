@@ -2,13 +2,13 @@
 
 class DefaultConfig(object):
     # 基本的配置
-    data_root = './data'                    # 数据集的存放路径
+    data_root = 'D:/WorkSpace/Python/CenterNet/data/'                   # 数据集的存放路径
     models_root = './checkpoints'           # 模型存放路径
-    train_dir= '/train2017'                 # 训练集路径
-    val_dir= '/val2017'                     # 验证集路径
-    label_dir= '/annotations_trainval2017'  # 标签路径
+    train_dir= 'train2017/'                 # 训练集路径
+    val_dir= 'val2017/'                     # 验证集路径
+    anno_dir= 'annotations/'                # 标签路径
     test_out_dir = './outputs'              # 测试图片标记输出目录
-    image_size = 96                         # 图像尺寸
+    img_size = 512                          # 图像尺寸
     device = 'cuda'                         # 使用的设备 cuda/cpu
 
     # 工具配置信息
