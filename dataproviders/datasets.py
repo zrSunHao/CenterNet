@@ -44,6 +44,7 @@ class COCODataset(Dataset):
     def __len__(self):
         return len(self.ids)
 
+
     def __getitem__(self, index):
 
         # 获取图片 id，以及图片标注
@@ -51,7 +52,7 @@ class COCODataset(Dataset):
         imgIds = [int(id_)]
         anno_ids = self.coco.getAnnIds(imgIds = imgIds, iscrowd = None)
         annotations = self.coco.loadAnns(anno_ids)
-        print(id_)
+
         # 读取图像，做预处理
         img_file = os.path.join(self.data_dir, self.name, '{:012}'.format(id_)+'.jpg')
         img = cv2.imread(img_file)
