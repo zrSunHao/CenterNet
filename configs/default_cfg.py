@@ -7,6 +7,7 @@ class DefaultConfig(object):
     train_dir= 'train2017/'                 # 训练集路径
     val_dir= 'val2017/'                     # 验证集路径
     anno_dir= 'annotations/'                # 标签路径
+    test_img_dir = './test'                 # 测试图片存储目录
     test_out_dir = './outputs'              # 测试图片标记输出目录
     img_size = 512                          # 图像尺寸
     device = 'cuda'                         # 使用的设备 cuda/cpu

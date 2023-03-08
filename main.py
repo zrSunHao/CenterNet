@@ -1,8 +1,6 @@
 import os
 import numpy as np
-import cv2
 import torch as t
-import torchvision as tv
 from torch.utils.data import DataLoader
 from torchnet.meter import AverageValueMeter
 
@@ -15,13 +13,6 @@ from tools import Visualizer, detection_collate,gt_creator
 cfg = DefaultCfg()
 device = t.device(cfg.device)
 vis = Visualizer(cfg.vis_env)
-
-class_labels = cfg.coco_class_labels
-class_index = cfg.coco_class_index
-class_color = []
-for _ in range(cfg.classes_num):
-    color = (np.random.randint(255),np.random.randint(255),np.random.randint(255))
-    class_color.append(color)
 
 # 数据
 dataset = COCODataset(data_dir = cfg.data_root,
@@ -67,8 +58,13 @@ for epoch in iter(epochs):
                             label_list = target)
         target = t.tensor(target).float().to(device=device)
 
+        total_loss = model_ft(imgs, target)
+        total_loss.backward()
+        optimizer.step()
+        loss_meter.add(total_loss.item())
 
-
+        if (ii+1) % cfg.plot_every == 0:
+            vis.plot('total_loss', loss_meter.value()[0])
 
     vis.save([cfg.vis_env])
     if (epoch+1) % cfg.save_every == 0:
