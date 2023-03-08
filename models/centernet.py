@@ -33,6 +33,10 @@ class CenterNet(nn.Module):
 
         self.cls_pred = nn.Sequential(
             ConvLayer(256, 64, kernel_size=3, padding=1),
+            nn.Conv2d(64, self.classes_num, kernel_size=1)
+        )
+        self.txty_pred = nn.Sequential(
+            ConvLayer(256, 64, kernel_size=3, padding=1),
             nn.Conv2d(64, 2, kernel_size=1)
         )
         self.twth_pred = nn.Sequential(
@@ -75,7 +79,77 @@ class CenterNet(nn.Module):
         return topk_score, topk_inds, top_clses
     
     def generate(self, x):
-        pass
+        c5 = self.backbone(x)
+        B = c5.size(0)
+        p5 = self.smooth(c5)
+        p4 = self.deconv5(p5)
+        p3 = self.deconv4(p4)
+        p2 = self.deconv3(p3)
 
-    def forward(self,x):
-        pass
+        cls_pred = self.cls_pred(p2)
+        txty_pred = self.txty_pred(p2)
+        twth_pred = self.twth_pred(p2)
+
+        cls_pred = t.sigmoid(cls_pred)
+        # 寻找 8-近邻极大值点，其中 keep 为极大值点的位置
+        # cls_pred 为对应的极大值点
+        hmax = nn.functional.max_pool2d(cls_pred, 
+                                        kernel_size = 5, 
+                                        padding = 2,
+                                        stride = 1)
+        keep = (hmax == cls_pred).float()
+        cls_pred = keep
+
+        txtytwth_pred = t.cat([txty_pred, twth_pred], dim =1) \
+                            .permute(0, 20, 3, 1) \
+                            .contiguous() \
+                            .view(B, -1, 4)
+        
+        scale = np.array([[[512, 512, 512, 512]]])
+        scale_t = t.tensor(scale.copy(), device=txtytwth_pred.device).float()
+        pre = self.decode(txtytwth_pred/scale_t)
+        pre = pre / scale_t
+        bbox_pred = t.clamp(pre[0], 0., 1.)
+        
+        # 得到 topk 取值， top_score：置信度，top_ink：index，topk_clses：类别
+        topk_score, topk_ind, top_clses = self.get_topk(cls_pred)
+        topk_bbox_pred = bbox_pred[topk_ind[0]]
+
+        topk_bbox_pred = topk_bbox_pred.cpu().numpy()
+        topk_score = topk_score[0].cpu().numpy()
+        top_clses = top_clses[0].cpu().numpy()
+        return topk_bbox_pred, topk_score, top_clses
+
+    def forward(self, x, target):
+        c5 = self.backbone(x)
+        B = c5.size(0)
+        p5 = self.smooth(c5)
+        p4 = self.deconv5(p5)
+        p3 = self.deconv4(p4)
+        p2 = self.deconv3(p3)
+        
+        cls_pred = self.cls_pred(p2)
+        txty_pred = self.txty_pred(p2)
+        twth_pred = self.twth_pred(p2)
+
+        # 热力图 [B, H*W, classes_num]
+        cls_pred = cls_pred.permute(0, 2, 3, 1) \
+                           .contiguous() \
+                           .view(B, -1, self.classes_num)
+        # 中心点偏移
+        txty_pred = txty_pred.permute(0, 2, 3, 1) \
+                             .contiguous() \
+                             .view(B, -1, 2)
+        # 物体尺度
+        twth_pred = twth_pred.permute(0, 2, 3, 1) \
+                             .contiguous() \
+                             .view(B, -1, 2)
+        # 计算损失函数
+        total_loss = get_loss(
+            pre_cls = cls_pred, 
+            pre_txty = txty_pred, 
+            pre_twth = twth_pred, 
+            label = target, 
+            classes_num = self.classes_num
+        )
+        return total_loss
