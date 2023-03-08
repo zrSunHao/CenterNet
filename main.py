@@ -1,19 +1,76 @@
 import os
+import numpy as np
+import cv2
 import torch as t
 import torchvision as tv
+from torch.utils.data import DataLoader
+from torchnet.meter import AverageValueMeter
 
-
+from models import CenterNet
 from dataproviders import COCODataset,Augmentation
 from configs import DefaultCfg 
-from tools import gt_creator
-import numpy as np
+from tools import Visualizer, detection_collate,gt_creator
 
+# 配置
 cfg = DefaultCfg()
-# dataset = COCODataset(data_dir = cfg.data_root,
-#                       anno_dir = cfg.anno_dir,
-#                       name = cfg.train_dir,
-#                       transform=Augmentation(img_size = cfg.img_size,)
-#                       )
-# img = dataset.__getitem__(0)
+device = t.device(cfg.device)
+vis = Visualizer(cfg.vis_env)
 
-#
+class_labels = cfg.coco_class_labels
+class_index = cfg.coco_class_index
+class_color = []
+for _ in range(cfg.classes_num):
+    color = (np.random.randint(255),np.random.randint(255),np.random.randint(255))
+    class_color.append(color)
+
+# 数据
+dataset = COCODataset(data_dir = cfg.data_root,
+                      anno_dir = cfg.anno_dir,
+                      name = cfg.train_dir,
+                      transform=Augmentation(img_size = cfg.img_size)
+                      )
+dataloader = DataLoader(dataset = dataset,
+                        batch_size = cfg.batch_size,
+                        shuffle = True,
+                        collate_fn = detection_collate,
+                        num_workers = cfg.num_workers
+                        )
+
+# 模型
+model_ft = CenterNet(classes_num = cfg.classes_num,
+                     topk = cfg.topk)
+if not cfg.net_path is None:
+    model_path = os.path.join(cfg.models_root, cfg.net_path)
+    if os.path.exists(model_path):
+        state_dict = t.load(model_path)
+        model_ft.load_state_dict(state_dict)
+model_ft.to(device)
+
+# 优化器
+optimizer = t.optim.Adam(model_ft.parameters, cfg.lr)
+
+loss_meter = AverageValueMeter()
+epochs = range(cfg.max_epoch)
+for epoch in iter(epochs):
+
+    if epoch+1 < cfg.cur_epoch:
+        continue
+    loss_meter.reset()
+
+    for ii, (imgs, target) in enumerate(dataloader):
+        optimizer.zero_grad()
+        imgs = imgs.to(device)
+        target = [label.tolist() for label in target]
+        target = gt_creator(input_size = cfg.img_size,
+                            stride = 4,
+                            classes_num = cfg.classes_num,
+                            label_list = target)
+        target = t.tensor(target).float().to(device=device)
+
+
+
+
+    vis.save([cfg.vis_env])
+    if (epoch+1) % cfg.save_every == 0:
+        model_path = '%s/centernet_%s.pth'% (cfg.models_root, str(epoch+1))
+        t.save(model_ft.state_dict(), model_path)
