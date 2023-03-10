@@ -1,7 +1,7 @@
 import torch as t
 import torch.nn as nn
 import numpy as np
-from torchvision.models import resnet18
+from torchvision.models import resnet18,ResNet18_Weights
 
 from models.convlayer import ConvLayer
 from models.decovlayer import DeCovLayer
@@ -17,9 +17,9 @@ class CenterNet(nn.Module):
         self.classes_num = classes_num
         self.topk = topk
 
-        self.backbone = resnet18(pretrained=True)
+        self.backbone = resnet18(weights=ResNet18_Weights.DEFAULT)
         self.backbone = nn.Sequential(
-            *list(self.backbone.children())
+            *list(self.backbone.children())[:-2]
         )
         self.smooth = nn.Sequential(
             SPP(),
@@ -43,6 +43,43 @@ class CenterNet(nn.Module):
             ConvLayer(256, 64, kernel_size=3, padding=1),
             nn.Conv2d(64, 2, kernel_size=1)
         )
+
+    def forward(self, x, target):
+        c5 = self.backbone(x)
+        B = c5.size(0)
+        p5 = self.smooth(c5)
+        p4 = self.deconv5(p5)
+        p3 = self.deconv4(p4)
+        p2 = self.deconv3(p3)
+        
+        cls_pred = self.cls_pred(p2)
+        txty_pred = self.txty_pred(p2)
+        twth_pred = self.twth_pred(p2)
+
+        # 热力图 [B, H*W, classes_num]
+        cls_pred = cls_pred.permute(0, 2, 3, 1) \
+                           .contiguous() \
+                           .view(B, -1, self.classes_num)
+        # 中心点偏移
+        txty_pred = txty_pred.permute(0, 2, 3, 1) \
+                             .contiguous() \
+                             .view(B, -1, 2)
+        # 物体尺度
+        twth_pred = twth_pred.permute(0, 2, 3, 1) \
+                             .contiguous() \
+                             .view(B, -1, 2)
+        # 计算损失函数
+        total_loss = get_loss(
+            pre_cls = cls_pred, 
+            pre_txty = txty_pred, 
+            pre_twth = twth_pred, 
+            label = target, 
+            classes_num = self.classes_num
+        )
+        return total_loss
+
+
+
 
     def decode(self, pred):
 
@@ -78,30 +115,31 @@ class CenterNet(nn.Module):
         top_clses = t.floor_divide(topk_ind, self.topk).int()
         return topk_score, topk_inds, top_clses
     
+    # 生成候选框，并进行可视化
     def generate(self, x):
-        c5 = self.backbone(x)
-        B = c5.size(0)
-        p5 = self.smooth(c5)
-        p4 = self.deconv5(p5)
+        c5 = self.backbone(x)       # resnet18 提取特征
+        B = c5.size(0)              # batch_size
+        p5 = self.smooth(c5)        # 
+        p4 = self.deconv5(p5)       #
         p3 = self.deconv4(p4)
         p2 = self.deconv3(p3)
 
-        cls_pred = self.cls_pred(p2)
-        txty_pred = self.txty_pred(p2)
-        twth_pred = self.twth_pred(p2)
-
+        cls_pred = self.cls_pred(p2)        # 类别热力图，预测结果
         cls_pred = t.sigmoid(cls_pred)
-        # 寻找 8-近邻极大值点，其中 keep 为极大值点的位置
+        txty_pred = self.txty_pred(p2)      # 偏移量预测结果
+        twth_pred = self.twth_pred(p2)      # 尺度预测结果
+
+        # 寻找 8-近邻极大值点，其中 keypoints 为极大值点的位置
         # cls_pred 为对应的极大值点
         hmax = nn.functional.max_pool2d(cls_pred, 
                                         kernel_size = 5, 
                                         padding = 2,
                                         stride = 1)
-        keep = (hmax == cls_pred).float()
-        cls_pred = keep
+        keypoints = (hmax == cls_pred).float()
+        cls_pred = keypoints
 
-        txtytwth_pred = t.cat([txty_pred, twth_pred], dim =1) \
-                            .permute(0, 20, 3, 1) \
+        txtytwth_pred = t.cat([txty_pred, twth_pred], dim = 1) \
+                            .permute(0, 2, 3, 1) \
                             .contiguous() \
                             .view(B, -1, 4)
         
@@ -120,36 +158,4 @@ class CenterNet(nn.Module):
         top_clses = top_clses[0].cpu().numpy()
         return topk_bbox_pred, topk_score, top_clses
 
-    def forward(self, x, target):
-        c5 = self.backbone(x)
-        B = c5.size(0)
-        p5 = self.smooth(c5)
-        p4 = self.deconv5(p5)
-        p3 = self.deconv4(p4)
-        p2 = self.deconv3(p3)
-        
-        cls_pred = self.cls_pred(p2)
-        txty_pred = self.txty_pred(p2)
-        twth_pred = self.twth_pred(p2)
-
-        # 热力图 [B, H*W, classes_num]
-        cls_pred = cls_pred.permute(0, 2, 3, 1) \
-                           .contiguous() \
-                           .view(B, -1, self.classes_num)
-        # 中心点偏移
-        txty_pred = txty_pred.permute(0, 2, 3, 1) \
-                             .contiguous() \
-                             .view(B, -1, 2)
-        # 物体尺度
-        twth_pred = twth_pred.permute(0, 2, 3, 1) \
-                             .contiguous() \
-                             .view(B, -1, 2)
-        # 计算损失函数
-        total_loss = get_loss(
-            pre_cls = cls_pred, 
-            pre_txty = txty_pred, 
-            pre_twth = twth_pred, 
-            label = target, 
-            classes_num = self.classes_num
-        )
-        return total_loss
+    

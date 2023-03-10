@@ -62,15 +62,12 @@ def generate_txtytwth(gt_label, w, h, s):
     c_y = (ymax + ymin) / 2 * h
     box_w = (xmax - xmin) * w
     box_h = (ymax - ymin) * h
-    print('c_x, c_y, box_w, box_h', c_x, c_y, box_w, box_h)
 
     box_w_s = box_w / s
     box_h_s = box_h / s
-    print('box_w_s,box_h_s',box_w_s,box_h_s)
 
     r = gaussian_radius([box_w_s, box_h_s])
     sigma_w = sigma_h = r / 3
-    print('r',r)
 
     if box_w < 1e-28 or box_h < 1e-28:
         return False
@@ -79,13 +76,11 @@ def generate_txtytwth(gt_label, w, h, s):
     c_y_s = c_y / s
     grid_x = int(c_x_s)
     grid_y = int(c_y_s)
-    print('grid_x,grid_y',grid_x,grid_y)
-
     tx = c_x_s - grid_x
     ty = c_y_s - grid_y
+
     tw = np.log(box_w_s)
     th = np.log(box_h_s)
-    print('tx,ty,tw,th',tx,ty,tw,th)
 
     return grid_x, grid_y, tx, ty, tw, th, sigma_w, sigma_h
 
@@ -103,7 +98,7 @@ def generate_txtytwth(gt_label, w, h, s):
 def gt_creator(input_size, stride, classes_num, label_list=[]):
     batch_size = len(label_list)
     w = input_size
-    h = batch_size
+    h = input_size
 
     s = stride
     ws = w // s
@@ -112,7 +107,7 @@ def gt_creator(input_size, stride, classes_num, label_list=[]):
     # 图片的torch储存格式: C H W
     gt_tensor = np.zeros([batch_size, hs, ws, classes_num + 4 + 1])
 
-    for batch_index in range(batch_index):
+    for batch_index in range(batch_size):
         for gt_label in label_list[batch_index]:
             gt_cls = gt_label[-1]
             result = generate_txtytwth(gt_label, w, h, s)
@@ -130,6 +125,7 @@ def gt_creator(input_size, stride, classes_num, label_list=[]):
                 b2 = grid_y + 3 * int(sigma_h)
                 for i in range(a1, a2):
                     for j in range(b1, b2):
+
                         if i < ws and i < hs:
                             v = np.exp(- (i - grid_x)**2 / (2*sigma_w**2) - (j - grid_y)**2 / (2*sigma_h**2))
                             pre_v = gt_tensor[batch_index, j, i, int(gt_cls)]

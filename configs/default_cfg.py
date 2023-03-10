@@ -22,7 +22,7 @@ class DefaultConfig(object):
     cur_epoch = 1                           # 当前训练的轮次，用于中途停止后再次训练时使用
     save_every = 1                          # 每训练多少个 epoch，保存一次模型
     num_workers = 0                         # 多进程加载数据所用的进程数，默认为0，表示不使用多进程
-    batch_size = 8                          # 每批次加载图像的数量
+    batch_size = 4                          # 每批次加载图像的数量
     lr = 1e-3                               # 学习率
 
     # 模型相关

@@ -38,7 +38,7 @@ if not cfg.net_path is None:
 model_ft.to(device)
 
 # 优化器
-optimizer = t.optim.Adam(model_ft.parameters, cfg.lr)
+optimizer = t.optim.Adam(model_ft.parameters(), cfg.lr)
 
 loss_meter = AverageValueMeter()
 epochs = range(cfg.max_epoch)
@@ -65,6 +65,7 @@ for epoch in iter(epochs):
 
         if (ii+1) % cfg.plot_every == 0:
             vis.plot('total_loss', loss_meter.value()[0])
+        print('%s / %s'%(ii,len(dataset)/cfg.batch_size))
 
     vis.save([cfg.vis_env])
     if (epoch+1) % cfg.save_every == 0:
