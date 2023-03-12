@@ -25,7 +25,6 @@ dataloader = DataLoader(dataset = dataset,
                         collate_fn = detection_collate,
                         num_workers = cfg.num_workers
                         )
-dataset.__getitem__(0)
 
 # 模型
 model_ft = CenterNet(classes_num = cfg.classes_num,

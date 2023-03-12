@@ -23,14 +23,8 @@ t4 = t.rand((8,512,1,1))
 d = t.cat([t1,t2,t3,t4],dim=1)
 print(d.size(), '\n')
 
-# backbone = resnet18(pretrained=True)
-# backbone = nn.Sequential(
-#             *list(backbone.children())
-#         )
-#print(backbone)
 
-tw = t.tensor([1,2,3,4,5,6])
-print(tw, '\n')
-tw = tw / 2
-tw = tw.int().float()
-print(tw)
+a = t.tensor([[1,2,3],[1,2,3]])
+b = t.tensor([[4,5,6],[4,5,6]])
+c = t.cat([a,b],dim=1)
+print(c, '\n')
