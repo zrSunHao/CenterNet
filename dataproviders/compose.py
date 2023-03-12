@@ -1,3 +1,6 @@
+'''
+对数据处理的组合
+'''
 class Compose(object):
 
     def __init__(self, transforms):

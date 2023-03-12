@@ -134,14 +134,21 @@ def gt_creator(input_size, stride, classes_num, label_list=[]):
     gt_tensor = gt_tensor.reshape(batch_size, -1, classes_num + 4 +1)
     return gt_tensor
 
-
+'''
+在 DataLoader 中对样本做进一步的处理
+    输入一个 batch 的数据
+    输出一个 batch 的数据
+'''
 def detection_collate(batch):
     targets = []
     imgs = []
+    '''
+    sample 的数据类型为[tensor, targets]
+    '''
     for sample in batch:
-        imgs.append(sample[0])
+        imgs.append(sample[0])   
         targets.append(t.FloatTensor(sample[1]))
-    return t.stack(imgs, 0),targets
+    return t.stack(imgs, 0), targets
 
 
 class FocalLoss(nn.Module):

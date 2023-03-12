@@ -1,5 +1,6 @@
 import cv2
 
+# 调整图片大小
 class Resize(object):
     def __init__(self,size = 300):
         self.size = size

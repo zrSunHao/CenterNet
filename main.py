@@ -1,5 +1,4 @@
 import os
-import numpy as np
 import torch as t
 from torch.utils.data import DataLoader
 from torchnet.meter import AverageValueMeter
@@ -26,6 +25,7 @@ dataloader = DataLoader(dataset = dataset,
                         collate_fn = detection_collate,
                         num_workers = cfg.num_workers
                         )
+dataset.__getitem__(0)
 
 # 模型
 model_ft = CenterNet(classes_num = cfg.classes_num,
@@ -65,7 +65,7 @@ for epoch in iter(epochs):
 
         if (ii+1) % cfg.plot_every == 0:
             vis.plot('total_loss', loss_meter.value()[0])
-        print('%s / %s'%(ii,len(dataset)/cfg.batch_size))
+        print('%s / %s'%(ii, len(dataset)/cfg.batch_size))
 
     vis.save([cfg.vis_env])
     if (epoch+1) % cfg.save_every == 0:
