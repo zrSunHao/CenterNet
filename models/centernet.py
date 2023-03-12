@@ -62,6 +62,14 @@ class CenterNet(nn.Module):
             nn.Conv2d(64, 2, kernel_size=1)
         )
 
+    '''
+    x:  [B, 3, 512, 512]
+    target: [B, 128 * 128, 85]
+        80个类
+        2个偏移量
+        2个尺寸
+        1个所属类别?
+    '''
     def forward(self, x, target):
         c5 = self.backbone(x)
         B = c5.size(0)
@@ -71,18 +79,18 @@ class CenterNet(nn.Module):
         p2 = self.deconv3(p3)
         
         cls_pred = self.cls_pred(p2)    # 输出:  [B, 80, 128, 128]
-        txty_pred = self.txty_pred(p2)  # 输出:  [B, 2, 128, 128]
-        twth_pred = self.twth_pred(p2)  # 输出:  [B, 2, 128, 128]
+        txty_pred = self.txty_pred(p2)  # 输出:  [B, 2,  128, 128]
+        twth_pred = self.twth_pred(p2)  # 输出:  [B, 2,  128, 128]
 
         # 热力图 [B, classes_num, 128, 128] ===> [B, 128 * 128, classes_num]
         cls_pred = cls_pred.permute(0, 2, 3, 1) \
                            .contiguous() \
                            .view(B, -1, self.classes_num)
-        # 中心点偏移 [B, 2, 128, 128]  ===> B, 128 * 128, 2]
+        # 中心点偏移 [B, 2, 128, 128]  ===> [B, 128 * 128, 2]
         txty_pred = txty_pred.permute(0, 2, 3, 1) \
                              .contiguous() \
                              .view(B, -1, 2)
-        # 物体尺度 [B, 2, 128, 128]  ===> B, 128 * 128, 2]
+        # 物体尺度 [B, 2, 128, 128]  ===> [B, 128 * 128, 2]
         twth_pred = twth_pred.permute(0, 2, 3, 1) \
                              .contiguous() \
                              .view(B, -1, 2)

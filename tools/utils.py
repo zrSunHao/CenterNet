@@ -111,7 +111,6 @@ def gt_creator(input_size, stride, classes_num, label_list=[]):
             result = generate_txtytwth(gt_label, w, h, s)
             if result:
                 grid_x, grid_y, tx, ty, tw, th, sigma_w, sigma_h = result
-
                 gt_tensor[batch_index, grid_y, grid_x, int(gt_cls)] = 1.0
                 gt_tensor[batch_index, grid_y, grid_x, classes_num: classes_num + 4] = np.array([tx, ty, tw, th])
                 gt_tensor[batch_index, grid_y, grid_x, classes_num + 4] = 1.0

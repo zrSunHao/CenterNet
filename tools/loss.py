@@ -1,26 +1,52 @@
 import torch as t
 import torch.nn as nn
 
+'''
+关键点，热力图的损失函数：
+    监督网络对中心点学习的效果
+    是对 Focal Loss 改进的
+'''
 class FocalLoss(nn.Module):
 
     def __init__(self):
         super(FocalLoss,self).__init__()
     
+    '''
+    inputs:  [B, 128 * 128, classes_num]
+    targets: [B, 128 * 128, classes_num]   80个类
+    '''
     def forward(self, inputs, targets):
+        # 激活函数，映射到 (0,1) 之间
         inputs = t.sigmoid(inputs)
+        # [B, 128 * 128, classes_num]
         center_id = (targets == 1.0).float()
+        # [B, 128 * 128, classes_num]
         other_id = (targets != 1.0).float()
         center_loss = -center_id * (1.0 -inputs)**2 * t.log(inputs + 1e-14)
         other_loss = -other_id * (1 - targets)**4 * (inputs)**2 * t.log(1.0 - inputs + 1e-14)
         return center_loss + other_loss
 
 
+'''
+损失函数
+参数：
+    pre_cls:    [B, 128 * 128, classes_num]
+    pre_txty:   [B, 128 * 128, 2]
+    pre_twth:   [B, 128 * 128, 2]
+    label:      [B, 128 * 128, 85]
+    classes_num: 80
+'''
 def get_loss(pre_cls, pre_txty, pre_twth, label, classes_num):
     cls_loss_function = FocalLoss()
     txty_loss_function = nn.BCEWithLogitsLoss(reduction='none')
     twth_loss_function = nn.SmoothL1Loss(reduction='none')
 
-    # 获取标记框 gt
+    '''
+    获取标记框 gt
+    gt_cls:       [B, 128 * 128, classes_num]
+    gt_txtytwth:  [B, 128 * 128, 4]
+    gt_box_scale_weight:[B, 128 * 128, 1]
+    '''
     gt_cls = label[:, :, :classes_num].float()
     gt_txtytwth = label[:, :, classes_num:-1].float()
     gt_box_scale_weight = label[:, :, -1]
