@@ -4,9 +4,9 @@ from torch.utils.data import DataLoader
 from torchnet.meter import AverageValueMeter
 
 from models import CenterNet
-from dataproviders import COCODataset,Augmentation
+from dataproviders import COCODataset,Augmentation,detection_collate
 from configs import DefaultCfg 
-from tools import Visualizer, detection_collate,gt_creator
+from tools import Visualizer,gt_creator
 
 # 配置
 cfg = DefaultCfg()

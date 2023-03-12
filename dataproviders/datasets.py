@@ -128,3 +128,20 @@ class COCODataset(Dataset):
         # hwc ===> chw
         img = t.from_numpy(img).permute(2, 0, 1)
         return img, target
+
+
+'''
+在 DataLoader 中对样本做进一步的处理
+    输入一个 batch 的数据
+    输出一个 batch 的数据
+'''
+def detection_collate(batch):
+    targets = []
+    imgs = []
+    '''
+    sample 的数据类型为[tensor, targets]
+    '''
+    for sample in batch:
+        imgs.append(sample[0])   
+        targets.append(t.FloatTensor(sample[1]))
+    return t.stack(imgs, 0), targets

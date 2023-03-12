@@ -1,6 +1,4 @@
 import numpy as np
-import torch as t
-import torch.nn as nn
 
 '''
 确定高斯圆的最小半径
@@ -134,65 +132,4 @@ def gt_creator(input_size, stride, classes_num, label_list=[]):
     gt_tensor = gt_tensor.reshape(batch_size, -1, classes_num + 4 +1)
     return gt_tensor
 
-'''
-在 DataLoader 中对样本做进一步的处理
-    输入一个 batch 的数据
-    输出一个 batch 的数据
-'''
-def detection_collate(batch):
-    targets = []
-    imgs = []
-    '''
-    sample 的数据类型为[tensor, targets]
-    '''
-    for sample in batch:
-        imgs.append(sample[0])   
-        targets.append(t.FloatTensor(sample[1]))
-    return t.stack(imgs, 0), targets
-
-
-class FocalLoss(nn.Module):
-
-    def __init__(self):
-        super(FocalLoss,self).__init__()
-    
-    def forward(self, inputs, targets):
-        inputs = t.sigmoid(inputs)
-        center_id = (targets == 1.0).float()
-        other_id = (targets != 1.0).float()
-        center_loss = -center_id * (1.0 -inputs)**2 * t.log(inputs + 1e-14)
-        other_loss = -other_id * (1 - targets)**4 * (inputs)**2 * t.log(1.0 - inputs + 1e-14)
-        return center_loss + other_loss
-
-
-def get_loss(pre_cls, pre_txty, pre_twth, label, classes_num):
-    cls_loss_function = FocalLoss()
-    txty_loss_function = nn.BCEWithLogitsLoss(reduction='none')
-    twth_loss_function = nn.SmoothL1Loss(reduction='none')
-
-    # 获取标记框 gt
-    gt_cls = label[:, :, :classes_num].float()
-    gt_txtytwth = label[:, :, classes_num:-1].float()
-    gt_box_scale_weight = label[:, :, -1]
-
-    # 中心点热力图损失 L_k
-    batch_size = pre_cls.size(0)
-    cls_loss = cls_loss_function(pre_cls, gt_cls)
-    cls_loss = t.sum(cls_loss) / batch_size
-
-    # 中心点偏移量损失 L_off
-    txty_loss = txty_loss_function(pre_txty, gt_txtytwth[:, :, :2])
-    txty_loss = t.sum(txty_loss, 2)
-    txty_loss = t.sum(txty_loss * gt_box_scale_weight)
-    txty_loss = txty_loss / batch_size
-
-    # 物体尺度损失 L_size
-    twth_loss = twth_loss_function(pre_twth, gt_txtytwth[:, :, 2:])
-    twth_loss = t.sum(twth_loss, 2)
-    twth_loss = t.sum(twth_loss * gt_box_scale_weight)
-    twth_loss = twth_loss / batch_size
-
-    # 总损失
-    total_loss = cls_loss + txty_loss + twth_loss
-    return total_loss
 
