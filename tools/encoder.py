@@ -102,7 +102,7 @@ def generate_txtytwth(gt_label, w, h, s):
     classes_num: 类别总数 80
     label_list: 原始标记值 [B, x, 5]
 输出：
-    gt_tensor: 高斯热力图，(B, H*W, classes_num+1+1)
+    gt_tensor: 高斯热力图，(B, 128 * 128, classes_num + 4 + 1)
 '''
 def gt_creator(input_size, stride, classes_num, label_list=[]):
     batch_size = len(label_list)
@@ -128,23 +128,32 @@ def gt_creator(input_size, stride, classes_num, label_list=[]):
             result = generate_txtytwth(gt_label, w, h, s)
             if result:
                 grid_x, grid_y, tx, ty, tw, th, sigma_w, sigma_h = result
+                # 图像关键点 (grid_y, grid_x) 所属 gt_cls 类的值为 1
                 gt_tensor[batch_index, grid_y, grid_x, int(gt_cls)] = 1.0
+                # 图像关键点 (grid_y, grid_x) 物体的宽、高、偏置赋值
                 gt_tensor[batch_index, grid_y, grid_x, classes_num: classes_num + 4] = np.array([tx, ty, tw, th])
+                # 图像关键点 (grid_y, grid_x) 位置的值标识为 1
                 gt_tensor[batch_index, grid_y, grid_x, classes_num + 4] = 1.0
 
-                # 创建高斯热力图
                 a1 = grid_x - 3 * int(sigma_w)
                 a2 = grid_x + 3 * int(sigma_w)
                 b1 = grid_y - 3 * int(sigma_h)
                 b2 = grid_y + 3 * int(sigma_h)
+                '''
+                创建高斯热力图
+                遍历关键点周围所有在高斯圆内的点，并赋值
+                '''
                 for i in range(a1, a2):
                     for j in range(b1, b2):
-
-                        if i < ws and i < hs:
+                        # 确保点在图像内
+                        if i < ws and j < hs:
                             v = np.exp(- (i - grid_x)**2 / (2*sigma_w**2) - (j - grid_y)**2 / (2*sigma_h**2))
+                            # 获取点当前图像点 (i, j) 所属 gt_cls 类的值
                             pre_v = gt_tensor[batch_index, j, i, int(gt_cls)]
+                            # 取点 (i, j) 【当前gt_cls 类的值】与【高热力图函数计算的值】中的最大值
                             gt_tensor[batch_index, j, i, int(gt_cls)] = max(v, pre_v)
-
+    
+    # (B, 128 * 128, classes_num + 4 + 1)
     gt_tensor = gt_tensor.reshape(batch_size, -1, classes_num + 4 +1)
     return gt_tensor
 
