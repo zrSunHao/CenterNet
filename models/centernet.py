@@ -6,7 +6,7 @@ from torchvision.models import resnet18,ResNet18_Weights
 from models.convlayer import ConvLayer
 from models.decovlayer import DeCovLayer
 from models.spp import SPP
-from tools import get_loss
+from tools import get_loss,decode,get_topk
 
 
 class CenterNet(nn.Module):
@@ -106,42 +106,6 @@ class CenterNet(nn.Module):
         return total_loss
 
 
-
-
-    def decode(self, pred):
-
-        output = t.zeros_like(pred)
-        grid_y, grid_x = t.meshgrid([
-            t.arange(128, device=pred.device),
-            t.arange(128, device=pred.device)
-            ])
-        grid_cell = t.stack([grid_x,grid_y], dim=1).float().view(1, 128*128, 2)
-        pred[:,:,:2] = 4 * (t.sigmoid(pred[:,:,:2]),+ grid_cell)
-        pred[:,:,2:] = 4 * (t.exp(pred[:,:,2:]))
-
-        # 坐标转换 [cx, xy, w, h] -> [xmin, ymin, xmax, ymax]
-        output[:,:,0] = pred[:,:,0] - pred[:,:,2] / 2
-        output[:,:,1] = pred[:,:,1] - pred[:,:,3] / 2
-        output[:,:,2] = pred[:,:,0] - pred[:,:,2] / 2
-        output[:,:,3] = pred[:,:,1] - pred[:,:,3] / 2
-
-        return output
-
-    def gather_feat(self, feat, ind):
-        dim = feat.size(2)
-        ind = ind.unsqueeze(2).expand(ind.size(0), ind.size(1), dim)
-        return feat.gather(1, ind)
-
-    # 选取 topk 个满足要求的点
-    def get_topk(self, scores):
-        B, C, H, W = scores.size()
-        topk_scores, topk_inds = t.topk(scores.view(B, C, -1), self.topk)
-        topk_inds = topk_inds % (H *W)
-        topk_score, topk_ind = t.topk(topk_scores.view(B, -1), topk_ind)
-        topk_inds = self.gather_feat(topk_inds.view(B, -1, -1), self.topk).view(B, self.topk)
-        top_clses = t.floor_divide(topk_ind, self.topk).int()
-        return topk_score, topk_inds, top_clses
-    
     # 生成候选框，并进行可视化
     def generate(self, x):
         c5 = self.backbone(x)       # resnet18 提取特征
@@ -162,8 +126,8 @@ class CenterNet(nn.Module):
                                         kernel_size = 5, 
                                         padding = 2,
                                         stride = 1)
-        keypoints = (hmax == cls_pred).float()
-        cls_pred = keypoints
+        keep = (hmax == cls_pred).float()
+        cls_pred = keep
 
         txtytwth_pred = t.cat([txty_pred, twth_pred], dim = 1) \
                             .permute(0, 2, 3, 1) \
@@ -172,12 +136,12 @@ class CenterNet(nn.Module):
         
         scale = np.array([[[512, 512, 512, 512]]])
         scale_t = t.tensor(scale.copy(), device=txtytwth_pred.device).float()
-        pre = self.decode(txtytwth_pred/scale_t)
+        pre = decode(txtytwth_pred/scale_t)
         pre = pre / scale_t
         bbox_pred = t.clamp(pre[0], 0., 1.)
         
         # 得到 topk 取值， top_score：置信度，top_ink：index，topk_clses：类别
-        topk_score, topk_ind, top_clses = self.get_topk(cls_pred)
+        topk_score, topk_ind, top_clses = get_topk(cls_pred)
         topk_bbox_pred = bbox_pred[topk_ind[0]]
 
         topk_bbox_pred = topk_bbox_pred.cpu().numpy()

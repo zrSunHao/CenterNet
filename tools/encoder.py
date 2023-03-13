@@ -41,7 +41,7 @@ def gaussian_radius(det_size, min_overlap=0.7):
 
 
 '''
-将原始 bbox 标注映射到特征图上
+获取真实标注信息
 输入：
     gt_label: round truth: [xmin, ymin, xmax, ymax, class_id]
     w, h: 输入图像的尺寸 512
@@ -83,14 +83,13 @@ def generate_txtytwth(gt_label, w, h, s):
     if box_w < 1e-28 or box_h < 1e-28:
         return False
     
-    
-    grid_x = int(c_x_s)
-    grid_y = int(c_y_s)
-    tx = c_x_s - grid_x
-    ty = c_y_s - grid_y
+    grid_x = int(c_x_s)     # 中心点 x 坐标向下取整
+    grid_y = int(c_y_s)     # 中心点 y 坐标向下取整
+    tx = c_x_s - grid_x     # 中心点 x 坐标偏移量
+    ty = c_y_s - grid_y     # 中心点 y 坐标偏移量
 
-    tw = np.log(box_w_s)
-    th = np.log(box_h_s)
+    tw = np.log(box_w_s)    # 宽高映射为类似网络输出的格式
+    th = np.log(box_h_s)    # 宽高映射为类似网络输出的格式
 
     return grid_x, grid_y, tx, ty, tw, th, sigma_w, sigma_h
 
