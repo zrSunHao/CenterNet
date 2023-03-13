@@ -44,8 +44,8 @@ def gaussian_radius(det_size, min_overlap=0.7):
 将原始 bbox 标注映射到特征图上
 输入：
     gt_label: round truth: [xmin, ymin, xmax, ymax, class_id]
-    w, h: 输入图像的尺寸
-    s: 缩放的尺度
+    w, h: 输入图像的尺寸 512
+    s: 缩放的尺度  4
 输出：
     中心点坐标: (grid_x, grid_y)
     偏移量: (tx, ty)
@@ -55,23 +55,35 @@ def gaussian_radius(det_size, min_overlap=0.7):
 def generate_txtytwth(gt_label, w, h, s):
     xmin, ymin, xmax, ymax = gt_label[:-1]
 
-    # 计算中心点、高度、宽度
-    c_x = (xmax + xmin) / 2 * w
-    c_y = (ymax + ymin) / 2 * h
-    box_w = (xmax - xmin) * w
-    box_h = (ymax - ymin) * h
+    '''
+    计算中心点、高度、宽度
+    这里坐标乘当前的 w、h 的原因：
+        在 COCODataset 中,图片resize后,标注框box的坐标需调整
+        坐标时除以了原始的 w、h
+        公式为：xmin = xmin / 图片原始宽度 * 调整之后的图片宽度
+    当前项目的公式为：
+        x = x / 图片原始宽度 * 512
+        y = y / 图片原始宽度 * 512
+    '''
+    c_x = (xmax * w + xmin * w) / 2 
+    c_y = (ymax * h + ymin * h) / 2
+    box_w = xmax * w - xmin * w
+    box_h = ymax * h - ymin * h
 
+    # 按尺度缩小
+    c_x_s = c_x / s
+    c_y_s = c_y / s
     box_w_s = box_w / s
     box_h_s = box_h / s
 
     r = gaussian_radius([box_w_s, box_h_s])
+    # r / 3 的原因：正态分布 99.7 的权重都在正负 3sigma 范围内
     sigma_w = sigma_h = r / 3
 
     if box_w < 1e-28 or box_h < 1e-28:
         return False
     
-    c_x_s = c_x / s
-    c_y_s = c_y / s
+    
     grid_x = int(c_x_s)
     grid_y = int(c_y_s)
     tx = c_x_s - grid_x
@@ -86,28 +98,34 @@ def generate_txtytwth(gt_label, w, h, s):
 '''
 创建高斯热力图，生成可用的标注信息
 输入：
-    input_size: 输入图像的尺寸
-    stride: 缩放的尺寸
-    classes_num: 类别总数
-    label_list: 原始标记值
+    input_size: 输入图像的尺寸 512
+    stride: 缩放的步长  4
+    classes_num: 类别总数 80
+    label_list: 原始标记值 [B, x, 5]
 输出：
-    gt_tensor: 高斯热力图，(H*W, classes_num+1+1)
+    gt_tensor: 高斯热力图，(B, H*W, classes_num+1+1)
 '''
 def gt_creator(input_size, stride, classes_num, label_list=[]):
     batch_size = len(label_list)
-    w = input_size
-    h = input_size
+    w = input_size  # 512
+    h = input_size  # 512
 
     s = stride
-    ws = w // s
-    hs = h // s
+    ws = w // s     # 尺寸缩放，向下取整
+    hs = h // s     # 尺寸缩放，向下取整
     
-    # 图片的torch储存格式: C H W
+    '''
+    要输出的图片标注信息: 
+        [B, H, W, classes_num + 4 + 1]
+    即：
+        [B, 128, 128, 80 + 4 + 1]
+    '''
     gt_tensor = np.zeros([batch_size, hs, ws, classes_num + 4 + 1])
 
-    for batch_index in range(batch_size):
-        for gt_label in label_list[batch_index]:
-            gt_cls = gt_label[-1]
+    for batch_index in range(batch_size):           # 每一个图像
+        # label_list[batch_index]: [x, 5]
+        for gt_label in label_list[batch_index]:    # 每一个标注,[5]
+            gt_cls = gt_label[-1]                   # 该标注物体所属类别
             result = generate_txtytwth(gt_label, w, h, s)
             if result:
                 grid_x, grid_y, tx, ty, tw, th, sigma_w, sigma_h = result

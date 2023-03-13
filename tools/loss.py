@@ -58,14 +58,22 @@ def get_loss(pre_cls, pre_txty, pre_twth, label, classes_num):
 
     # 中心点偏移量损失 L_off
     txty_loss = txty_loss_function(pre_txty, gt_txtytwth[:, :, :2])
-    txty_loss = t.sum(txty_loss, 2)
-    txty_loss = t.sum(txty_loss * gt_box_scale_weight)
+    # 合并标号为2的维度 [B, 128 * 128, 4] ===> [B, 128 * 128]
+    txty_loss = t.sum(txty_loss, dim=2)
+    # [B, 128 * 128] * [B, 128 * 128] ===> [B, 128 * 128]
+    txty_loss = txty_loss * gt_box_scale_weight
+    # [B, 128 * 128] ===> 1
+    txty_loss = t.sum(txty_loss)
     txty_loss = txty_loss / batch_size
 
     # 物体尺度损失 L_size
     twth_loss = twth_loss_function(pre_twth, gt_txtytwth[:, :, 2:])
-    twth_loss = t.sum(twth_loss, 2)
-    twth_loss = t.sum(twth_loss * gt_box_scale_weight)
+    # 合并标号为2的维度 [B, 128 * 128, 2] ===> [B, 128 * 128]
+    twth_loss = t.sum(twth_loss, dim=2)
+    # [B, 128 * 128] * [B, 128 * 128] ===> [B, 128 * 128]
+    twth_loss = twth_loss * gt_box_scale_weight
+    # [B, 128 * 128] ===> 1
+    twth_loss = t.sum(twth_loss)
     twth_loss = twth_loss / batch_size
 
     # 总损失
