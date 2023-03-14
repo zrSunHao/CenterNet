@@ -39,27 +39,52 @@ for index, file in enumerate(os.listdir(cfg.test_img_dir)):
     # [3, 512, 512] ===> [1, 3, 512, 512]
     x = x.unsqueeze(0).to(device)
 
-    bbox_pred, score, cls_ind = model_ft.generate(x)
+    '''
+    bbox_pred:  
+        关键点边框坐标 [100, 4]
+        最后的维度为：[xmin, ymin, xmax, ymax]
+    scores:  topk 个关键点置信度 [topk]
+    clses:  topk 个关键点所属类别的索引编码 [topk]
+    '''
+    bbox_pred, scores, cls_ind = model_ft.generate(x)
+    '''
+    img.shape 
+        [h, w, c]
+    当前的坐标值为
+        x现 / 512 = x原 / 原始宽度
+        y现 / 512 = y原 / 原始高度
+    乘以原宽高可得：
+        x原 = x现/512 * 原始宽度
+        y原 = y现/512 * 原始高度
+    '''
     bbox_pred = bbox_pred * np.array([[img.shape[1],
                                        img.shape[0],
                                        img.shape[1],
                                        img.shape[0]]])
     
+    # 循环标注 topk 个点
     for i,box in enumerate(bbox_pred):
-        if score[i]>0.35:
+         # 只有达到置信度的最低阈值，才标注目标
+        if scores[i] > cfg.score:
+
+            # 关键点所属类别的索引
             cls_indx = cls_ind[i]
             cls_id = class_index[int(cls_indx)]
             cls_name = class_labels[cls_id]
-            label = '%s:%.3f' % (cls_name,score[i])
-            xmin, ymin, xmax, ymax = box
+            label = '%s:%.3f' % (cls_name,scores[i])
 
+            # 标注框两个角点的坐标
+            xmin, ymin, xmax, ymax = box
+            # 坐标取整
             pt1 = (int(xmin), int(ymin))
             pt2 = (int(xmax), int(ymax))
+            # 标注框的颜色
             color = class_color[int(cls_indx)]
             cv2.rectangle(img, pt1, pt2, color, thickness=2)
 
-            pt1 = (int(xmin), int(abs(ymin) - 15))
-            pt2 = (int(xmin + int(xmax-xmin) * 0.55), int(ymin))
+            # 标签标注框的两个角点
+            pt1 = (int(xmin), int(abs(ymin) - 15)) # 左上角
+            pt2 = (int(xmin + int(xmax-xmin) * 0.55), int(ymin)) # 右下角
             color = class_color[int(cls_indx)]
             # thickness为负值，表示填充整个矩形
             cv2.rectangle(img, pt1, pt2, color, thickness=-1)

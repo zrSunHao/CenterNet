@@ -113,7 +113,9 @@ class CenterNet(nn.Module):
     输入：
         [1, 3, 512, 512]
     输出：
-
+        topk_bbox_pred:  关键点边框坐标 [100, 4]
+        topk_scores:  topk 个关键点置信度 [topk]
+        top_clses:  topk 个关键点所属类别 [topk]
     '''
     def generate(self, x):
         c5 = self.backbone(x)       # resnet18 提取特征
@@ -158,16 +160,29 @@ class CenterNet(nn.Module):
         pre = decode_lxlyrxry(txtytwth_pred)
         # 这里是坐标点的转换，得坐标点为： x现/512 = x原/原始宽度
         pre = pre / scale_t
-        # 夹紧区间，避免有在 [0,1] 区间之外的值
+        # 夹紧区间，避免有在 [0,1] 区间之外的值 [128 * 128, 4]
         bbox_pred = t.clamp(pre[0], min = 0., max = 1.)
         
-        # 得到 topk 取值， top_score：置信度，top_ink：index，topk_clses：类别
-        topk_score, topk_ind, top_clses = get_topk(cls_pred)
+        '''
+        得到 topk 取值、索引、类别
+        topk_scores: topk个关键点每个的置信度[B, topk]
+        topk_inds: topk个关键点每个的索引 [B, topk]
+        top_clses: topk个关键点每个的类别 [B, topk] 
+        '''
+        topk_scores, topk_ind, top_clses = get_topk(self.topk, cls_pred)
+        '''
+        [100, 4]，获取关键点上预测的边框坐标，
+        最后的维度为：[xmin, ymin, xmax, ymax]
+        '''
         topk_bbox_pred = bbox_pred[topk_ind[0]]
 
-        topk_bbox_pred = topk_bbox_pred.cpu().numpy()
-        topk_score = topk_score[0].cpu().numpy()
-        top_clses = top_clses[0].cpu().numpy()
-        return topk_bbox_pred, topk_score, top_clses
+        # [topk, 4]
+        topk_bbox_pred = topk_bbox_pred.detach().numpy()
+        # [topk]
+        topk_scores = topk_scores[0].detach().numpy()
+        # [topk]
+        top_clses = top_clses[0].detach().numpy()
+        
+        return topk_bbox_pred, topk_scores, top_clses
 
     

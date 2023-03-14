@@ -47,21 +47,72 @@ def decode_lxlyrxry(pred):
     return output
 
 
-
+'''
+在 dim 维度上，按照 indexs 所给的坐标选择元素
+参数：
+    feat: [B, 80 * topk, 1]  temp_cls_inds
+    ind:  [B, topk]          img_topk_inds
+返回：
+    [B, topk, 1]
+'''
 def gather_feat(feat, ind):
-    dim = feat.size(2)
-    ind = ind.unsqueeze(2).expand(ind.size(0), ind.size(1), dim)
+    
+    B = ind.size(0)     # B
+    topk = ind.size(1)  # topk
+    dim = feat.size(2)  # 1
+    
+    # [B, topk] ==> [B, topk, 1]
+    ind = ind.unsqueeze(2)
+    # [B, topk, 1] ===> [B, topk, 1]
+    ind = ind.expand(B, topk, dim)
+    # [B, 80 * topk, 1] [B, topk, 1] ===> [B, topk, 1]
     return feat.gather(1, ind)
 
 
-
-# 选取 topk 个满足要求的点
+'''
+选取 topk 个满足要求的点
+参数
+    topk:符合要求点的个数
+    cls_pred: 各类别关键点[B, 80, 128, 128]，关键点的值为 1
+返回
+    img_topk_scores: topk个关键点每个的置信度[B, topk]
+    topk_inds: 图 128 * 128 一维张量上的 topk 个关键点的索引 [B, topk]
+    top_clses: topk个关键点每个的类别 [B, topk] 
+'''
 def get_topk(topk, scores):
     B, C, H, W = scores.size()
-    topk_scores, topk_inds = t.topk(scores.view(B, C, -1), topk)
-    topk_inds = topk_inds % (H *W)
-    topk_score, topk_ind = t.topk(topk_scores.view(B, -1), topk_ind)
-    topk_inds = gather_feat(topk_inds.view(B, -1, -1), topk).view(B, topk)
-    top_clses = t.floor_divide(topk_ind, topk).int()
-    return topk_score, topk_inds, top_clses
+
+    '''
+    【每张图片】的【每个类别】各取置信度最高的 topk 个点
+    '''
+    # [B, 80, 128 * 128]
+    cls_scores = scores.view(B, C, -1)
+    # [B, 80, topk] [B, 80, topk]
+    cls_topk_scores, cls_topk_inds = t.topk(cls_scores, topk)
+    # 索引取余，防止超出范围
+    cls_topk_inds = cls_topk_inds % (H * W)
+
+    '''
+    【每张图片】各取置信度最高的 topk 个点
+    '''
+    # [B, 80, topk] ===> [B, 80 * topk]
+    temp_cls_scores = cls_topk_scores.view(B, -1)
+    # [B, topk] [B, topk]
+    img_topk_scores, img_topk_inds = t.topk(temp_cls_scores, topk)
+
+    '''
+    获取每张图 topk 个点的索引，在 [80, 128 * 128] 的尺度上
+    在每张图片的 128 * 128 一维张量上的 topk 个点的索引
+    '''
+    # [B, 80, topk] ===> [B, 80 * topk, 1]
+    temp_cls_inds = cls_topk_inds.view(B, -1, 1)
+    # [B, 80 * topk, 1] [B, topk] ===> [B, topk, 1] ===> [B, topk]
+    topk_inds = gather_feat(temp_cls_inds, img_topk_inds).view(B, topk)
+    '''
+    索引/topk 向下取整 [B, topk] ===> [B, topk]
+    除完之后，可得topk个关键点每个的类别
+    '''
+    top_clses = t.floor_divide(img_topk_inds, topk).int()
+
+    return img_topk_scores, topk_inds, top_clses
     
