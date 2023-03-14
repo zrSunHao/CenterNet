@@ -49,6 +49,7 @@ def get_loss(pre_cls, pre_txty, pre_twth, label, classes_num):
     '''
     gt_cls = label[:, :, :classes_num].float()
     gt_txtytwth = label[:, :, classes_num:-1].float()
+    # 关键点的位置为 1，其余点为 0
     gt_box_scale_weight = label[:, :, -1]
 
     # 中心点热力图损失 L_k

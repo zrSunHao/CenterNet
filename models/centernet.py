@@ -6,7 +6,7 @@ from torchvision.models import resnet18,ResNet18_Weights
 from models.convlayer import ConvLayer
 from models.decovlayer import DeCovLayer
 from models.spp import SPP
-from tools import get_loss,decode,get_topk
+from tools import get_loss,decode_lxlyrxry,get_topk
 
 
 class CenterNet(nn.Module):
@@ -106,39 +106,60 @@ class CenterNet(nn.Module):
         return total_loss
 
 
-    # 生成候选框，并进行可视化
+    '''
+    生成候选框，并进行可视化
+    当前部分代码仅支持一张图片检测，即：
+        B(batch_size) = 1
+    输入：
+        [1, 3, 512, 512]
+    输出：
+
+    '''
     def generate(self, x):
         c5 = self.backbone(x)       # resnet18 提取特征
         B = c5.size(0)              # batch_size
-        p5 = self.smooth(c5)        # 
-        p4 = self.deconv5(p5)       #
+        p5 = self.smooth(c5)        # 空间金字塔，增大感受野
+        p4 = self.deconv5(p5)
         p3 = self.deconv4(p4)
         p2 = self.deconv3(p3)
 
-        cls_pred = self.cls_pred(p2)        # 类别热力图，预测结果
+        # 类别热力图, 预测结果, 输出:  [B, 80, 128, 128]
+        cls_pred = self.cls_pred(p2)
         cls_pred = t.sigmoid(cls_pred)
-        txty_pred = self.txty_pred(p2)      # 偏移量预测结果
-        twth_pred = self.twth_pred(p2)      # 尺度预测结果
+        # 偏移量预测结果, 输出:  [B, 2,  128, 128]
+        txty_pred = self.txty_pred(p2) 
+        # 尺度预测结果, 输出:  [B, 2,  128, 128]
+        twth_pred = self.twth_pred(p2)  
 
-        # 寻找 8-近邻极大值点，其中 keypoints 为极大值点的位置
-        # cls_pred 为对应的极大值点
+        '''
+        寻找 8-近邻极大值点，其中 keypoints 为极大值点的位置
+        cls_pred 为对应的极大值点
+        '''
         hmax = nn.functional.max_pool2d(cls_pred, 
                                         kernel_size = 5, 
                                         padding = 2,
                                         stride = 1)
+        # [B, 80, 128, 128]，相等的值为 1
         keep = (hmax == cls_pred).float()
         cls_pred = keep
-
+        
+        '''
+        bbox坐标转换
+        '''
+        # [B, 4, 128, 128] ===> [B, 128, 128, 4] ===> [B, 128 * 128, 4]
         txtytwth_pred = t.cat([txty_pred, twth_pred], dim = 1) \
                             .permute(0, 2, 3, 1) \
                             .contiguous() \
                             .view(B, -1, 4)
-        
+        # [1, 1, 4]
         scale = np.array([[[512, 512, 512, 512]]])
         scale_t = t.tensor(scale.copy(), device=txtytwth_pred.device).float()
-        pre = decode(txtytwth_pred/scale_t)
+        # [B, 128 * 128, 4] 最后的维度为：[xmin, ymin, xmax, ymax]
+        pre = decode_lxlyrxry(txtytwth_pred)
+        # 这里是坐标点的转换，得坐标点为： x现/512 = x原/原始宽度
         pre = pre / scale_t
-        bbox_pred = t.clamp(pre[0], 0., 1.)
+        # 夹紧区间，避免有在 [0,1] 区间之外的值
+        bbox_pred = t.clamp(pre[0], min = 0., max = 1.)
         
         # 得到 topk 取值， top_score：置信度，top_ink：index，topk_clses：类别
         topk_score, topk_ind, top_clses = get_topk(cls_pred)

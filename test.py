@@ -20,13 +20,13 @@ for _ in range(cfg.classes_num):
 
 
 # 加载预训练模型
-assert not cfg.net_path is None
+#assert not cfg.net_path is None
 model_ft = CenterNet(classes_num = cfg.classes_num,
                      topk = cfg.topk)
-model_path = os.path.join(cfg.models_root, cfg.net_path)
-if os.path.exists(model_path):
-    state_dict = t.load(model_path)
-    model_ft.load_state_dict(state_dict)
+# model_path = os.path.join(cfg.models_root, cfg.net_path)
+# if os.path.exists(model_path):
+#     state_dict = t.load(model_path)
+#     model_ft.load_state_dict(state_dict)
 model_ft.to(device)
 
 transform = Augmentation()
@@ -36,6 +36,7 @@ for index, file in enumerate(os.listdir(cfg.test_img_dir)):
     img = transform(img, boxes=None, labels=None)
 
     x = t.from_numpy(img[0][:,:,(2,1,0)]).permute(2,0,1)
+    # [3, 512, 512] ===> [1, 3, 512, 512]
     x = x.unsqueeze(0).to(device)
 
     bbox_pred, score, cls_ind = model_ft.generate(x)
