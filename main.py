@@ -6,7 +6,7 @@ from torchnet.meter import AverageValueMeter
 from models import CenterNet
 from dataproviders import COCODataset,Augmentation,detection_collate
 from configs import DefaultCfg 
-from tools import Visualizer,gt_creator
+from tools import Visualizer,gt_creator,get_loss
 
 # 配置
 cfg = DefaultCfg()
@@ -57,14 +57,37 @@ for epoch in iter(epochs):
                             label_list = target)
         target = t.tensor(target).float().to(device=device)
 
-        total_loss = model_ft(imgs, target)
+        cls_pred, txty_pred, twth_pred = model_ft(imgs)
+
+        # 热力图 [B, classes_num, 128, 128] ===> [B, 128 * 128, classes_num]
+        cls_pred = cls_pred.permute(0, 2, 3, 1) \
+                           .contiguous() \
+                           .view(cfg.batch_size, -1, cfg.classes_num)
+        # 中心点偏移 [B, 2, 128, 128]  ===> [B, 128 * 128, 2]
+        txty_pred = txty_pred.permute(0, 2, 3, 1) \
+                             .contiguous() \
+                             .view(cfg.batch_size, -1, 2)
+        # 物体尺度 [B, 2, 128, 128]  ===> [B, 128 * 128, 2]
+        twth_pred = twth_pred.permute(0, 2, 3, 1) \
+                             .contiguous() \
+                             .view(cfg.batch_size, -1, 2)
+
+        # 计算损失函数
+        total_loss = get_loss(
+            pre_cls = cls_pred, 
+            pre_txty = txty_pred, 
+            pre_twth = twth_pred, 
+            label = target, 
+            classes_num = cfg.classes_num
+        )
+
         total_loss.backward()
         optimizer.step()
         loss_meter.add(total_loss.item())
 
         if (ii+1) % cfg.plot_every == 0:
             vis.plot('total_loss', loss_meter.value()[0])
-        print('%s / %s'%(ii, len(dataset)/cfg.batch_size))
+        print('%s / %s -----> %s'%(ii, len(dataset)/cfg.batch_size,total_loss.item()))
 
     vis.save([cfg.vis_env])
     if (epoch+1) % cfg.save_every == 0:

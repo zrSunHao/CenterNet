@@ -6,6 +6,7 @@ import cv2
 from models import CenterNet
 from configs import DefaultCfg 
 from dataproviders import Augmentation
+from tools import decode_bbox
 
 # 配置
 cfg = DefaultCfg()
@@ -33,9 +34,9 @@ transform = Augmentation()
 for index, file in enumerate(os.listdir(cfg.test_img_dir)):
     path = cfg.test_img_dir + '/' + file
     img = cv2.imread(path, cv2.IMREAD_COLOR)
-    img = transform(img, boxes=None, labels=None)
+    input = transform(img, boxes=None, labels=None)
 
-    x = t.from_numpy(img[0][:,:,(2,1,0)]).permute(2,0,1)
+    x = t.from_numpy(input[0][:,:,(2,1,0)]).permute(2,0,1)
     # [3, 512, 512] ===> [1, 3, 512, 512]
     x = x.unsqueeze(0).to(device)
 
@@ -46,7 +47,8 @@ for index, file in enumerate(os.listdir(cfg.test_img_dir)):
     scores:  topk 个关键点置信度 [topk]
     clses:  topk 个关键点所属类别的索引编码 [topk]
     '''
-    bbox_pred, scores, cls_ind = model_ft.generate(x)
+    cls_pred, txty_pred, twth_pred = model_ft(x)
+    bbox_pred, scores, cls_ind = decode_bbox(cls_pred, txty_pred, twth_pred,cfg.topk)
     '''
     img.shape 
         [h, w, c]

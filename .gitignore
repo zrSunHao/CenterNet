@@ -1,4 +1,5 @@
 data/
 test/
+outputs/
 checkpoints/
 **/__pycache__

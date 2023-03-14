@@ -24,6 +24,7 @@ class FocalLoss(nn.Module):
         other_id = (targets != 1.0).float()
         center_loss = -center_id * (1.0 -inputs)**2 * t.log(inputs + 1e-14)
         other_loss = -other_id * (1 - targets)**4 * (inputs)**2 * t.log(1.0 - inputs + 1e-14)
+
         return center_loss + other_loss
 
 
