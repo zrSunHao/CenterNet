@@ -59,19 +59,6 @@ for epoch in iter(epochs):
 
         cls_pred, txty_pred, twth_pred = model_ft(imgs)
 
-        # 热力图 [B, classes_num, 128, 128] ===> [B, 128 * 128, classes_num]
-        cls_pred = cls_pred.permute(0, 2, 3, 1) \
-                           .contiguous() \
-                           .view(cfg.batch_size, -1, cfg.classes_num)
-        # 中心点偏移 [B, 2, 128, 128]  ===> [B, 128 * 128, 2]
-        txty_pred = txty_pred.permute(0, 2, 3, 1) \
-                             .contiguous() \
-                             .view(cfg.batch_size, -1, 2)
-        # 物体尺度 [B, 2, 128, 128]  ===> [B, 128 * 128, 2]
-        twth_pred = twth_pred.permute(0, 2, 3, 1) \
-                             .contiguous() \
-                             .view(cfg.batch_size, -1, 2)
-
         # 计算损失函数
         total_loss = get_loss(
             pre_cls = cls_pred, 

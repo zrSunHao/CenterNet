@@ -38,6 +38,20 @@ class FocalLoss(nn.Module):
     classes_num: 80
 '''
 def get_loss(pre_cls, pre_txty, pre_twth, label, classes_num):
+    batch_size = pre_cls.size(0)
+    # 热力图 [B, classes_num, 128, 128] ===> [B, 128 * 128, classes_num]
+    pre_cls = pre_cls.permute(0, 2, 3, 1) \
+                        .contiguous() \
+                        .view(batch_size, -1, classes_num)
+    # 中心点偏移 [B, 2, 128, 128]  ===> [B, 128 * 128, 2]
+    pre_txty = pre_txty.permute(0, 2, 3, 1) \
+                            .contiguous() \
+                            .view(batch_size, -1, 2)
+    # 物体尺度 [B, 2, 128, 128]  ===> [B, 128 * 128, 2]
+    pre_twth = pre_twth.permute(0, 2, 3, 1) \
+                            .contiguous() \
+                            .view(batch_size, -1, 2)
+
     cls_loss_function = FocalLoss()
     txty_loss_function = nn.BCEWithLogitsLoss(reduction='none')
     twth_loss_function = nn.SmoothL1Loss(reduction='none')
@@ -54,7 +68,6 @@ def get_loss(pre_cls, pre_txty, pre_twth, label, classes_num):
     gt_box_scale_weight = label[:, :, -1]
 
     # 中心点热力图损失 L_k
-    batch_size = pre_cls.size(0)
     cls_loss = cls_loss_function(pre_cls, gt_cls)
     cls_loss = t.sum(cls_loss) / batch_size
 
