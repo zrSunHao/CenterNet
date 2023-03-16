@@ -20,7 +20,7 @@ class DefaultConfig(object):
     # 训练相关的配置
     max_epoch = 100                         # 最大训练轮次
     cur_epoch = 1                           # 当前训练的轮次，用于中途停止后再次训练时使用
-    save_every = 1                          # 每训练多少个 epoch，保存一次模型
+    save_every = 3                          # 每训练多少个 epoch，保存一次模型
     num_workers = 0                         # 多进程加载数据所用的进程数，默认为0，表示不使用多进程
     batch_size = 4                          # 每批次加载图像的数量
     lr = 1e-3                               # 学习率
@@ -28,8 +28,8 @@ class DefaultConfig(object):
     # 模型相关
     classes_num = 80                        # 图片类别数
     topk = 100                              # 
-    net_path = None                         # 预训练的判别器模型路径
-    score = 0.35                            # 模型预测结果的置信度
+    net_path = 'centernet_2.pth'                         # 预训练的判别器模型路径
+    score = 0.1                            # 模型预测结果的置信度
 
     coco_class_labels = ('background',
                         'person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus', 'train', 'truck',

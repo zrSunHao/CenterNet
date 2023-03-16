@@ -83,7 +83,6 @@ def gather_feat(feat, ind):
 '''
 def get_topk(topk, scores):
     B, C, H, W = scores.size()
-
     '''
     【每张图片】的【每个类别】各取置信度最高的 topk 个点
     '''
@@ -115,7 +114,6 @@ def get_topk(topk, scores):
     除完之后，可得topk个关键点每个的类别
     '''
     top_clses = t.floor_divide(img_topk_inds, topk).int()
-
     return img_topk_scores, topk_inds, top_clses
 
 
@@ -147,7 +145,7 @@ def decode_bbox(cls_pred, txty_pred, twth_pred, topk):
                                     stride = 1)
     # [B, 80, 128, 128]，相等的值为 1
     keep = (hmax == cls_pred).float()
-    cls_pred = keep
+    cls_pred *= keep
     
     '''
     bbox坐标转换

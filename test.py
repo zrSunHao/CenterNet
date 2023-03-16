@@ -24,10 +24,10 @@ for _ in range(cfg.classes_num):
 #assert not cfg.net_path is None
 model_ft = CenterNet(classes_num = cfg.classes_num,
                      topk = cfg.topk)
-# model_path = os.path.join(cfg.models_root, cfg.net_path)
-# if os.path.exists(model_path):
-#     state_dict = t.load(model_path)
-#     model_ft.load_state_dict(state_dict)
+model_path = os.path.join(cfg.models_root, cfg.net_path)
+if os.path.exists(model_path):
+    state_dict = t.load(model_path)
+    model_ft.load_state_dict(state_dict)
 model_ft.to(device)
 
 transform = Augmentation()
@@ -39,7 +39,7 @@ for index, file in enumerate(os.listdir(cfg.test_img_dir)):
     x = t.from_numpy(input[0][:,:,(2,1,0)]).permute(2,0,1)
     # [3, 512, 512] ===> [1, 3, 512, 512]
     x = x.unsqueeze(0).to(device)
-
+    
     '''
     bbox_pred:  
         关键点边框坐标 [100, 4]
@@ -63,7 +63,8 @@ for index, file in enumerate(os.listdir(cfg.test_img_dir)):
                                        img.shape[0],
                                        img.shape[1],
                                        img.shape[0]]])
-    
+    # print(scores)
+    # print(cls_ind,'\n')
     # 循环标注 topk 个点
     for i,box in enumerate(bbox_pred):
          # 只有达到置信度的最低阈值，才标注目标
@@ -71,6 +72,8 @@ for index, file in enumerate(os.listdir(cfg.test_img_dir)):
 
             # 关键点所属类别的索引
             cls_indx = cls_ind[i]
+            # if(cls_indx == 0 or  cls_indx == 2):
+            #     continue
             cls_id = class_index[int(cls_indx)]
             cls_name = class_labels[cls_id]
             label = '%s:%.3f' % (cls_name,scores[i])
