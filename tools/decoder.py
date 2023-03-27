@@ -5,7 +5,7 @@ import numpy as np
 '''
 输入：
     txtytwth_pred  [B, 128 * 128, 4]
-    最后的维度为：[cx, xy, w, h]
+    最后的维度为：[cx, cy, w, h]
 当前部分代码仅支持一张图片检测，即：
     B(batch_size) = 1
 作用：
@@ -35,7 +35,7 @@ def decode_lxlyrxry(pred):
     grid_cell = t.stack([grid_x, grid_y], dim=-1).float().view(1, 128*128, 2)
     
     pred[:,:,:2] = t.sigmoid(pred[:,:,:2])
-    # 因 x,y 坐标的值全为 0.xxx 所以需加位置坐标值 grid_cell
+    # 偏置需加位置坐标值 grid_cell，后面计算中心点时可得真正的坐标
     pred[:,:,:2] = 4 *(pred[:,:,:2] + grid_cell)
     # TODO 与 encoder generate_txtytwth 函数中的 tw、th 的求值运算互反
     pred[:,:,2:] = 4 * (t.exp(pred[:,:,2:]))

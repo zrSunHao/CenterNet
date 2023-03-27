@@ -28,7 +28,7 @@ class DefaultConfig(object):
     # 模型相关
     classes_num = 80                        # 图片类别数
     topk = 100                              # 
-    net_path = 'centernet_6.pth'                         # 预训练的判别器模型路径
+    net_path = 'centernet_8.pth'                         # 预训练的判别器模型路径
     score = 0.15                            # 模型预测结果的置信度
 
     coco_class_labels = ('background',
